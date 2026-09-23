@@ -1,0 +1,13 @@
+{
+  "modelName": "TerraTrace Segmentation Model",
+  "format": "ONNX",
+  "inputWidth": 1024,
+  "inputHeight": 1024,
+  "channels": 3,
+  "classes": [
+    "background",
+    "parcel",
+    "building",
+    "road"
+  ]
+}

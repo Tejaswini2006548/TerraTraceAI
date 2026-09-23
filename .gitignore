@@ -1,0 +1,17 @@
+backend/target/
+backend/model-env/
+backend/uploads/*
+backend/models/segmentation/*.pth
+backend/models/segmentation/*.onnx
+backend/models/segmentation/*.onnx.data
+backend/*.log
+backend/startup-error.txt
+backend/building_mask.png
+backend/building_overlay.png
+backend/gis_buildings_test.json
+backend/src/main/java/com/terratrace/service/GeoJsonService.backup.txt
+backend/src/main/resources/application.properties
+data/*
+*.class
+*.jar
+.env

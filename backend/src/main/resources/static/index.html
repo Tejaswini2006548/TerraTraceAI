@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>TerraTrace AI</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+        }
+
+        header {
+            padding: 16px 24px;
+            background: #1f2937;
+            color: white;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        #info {
+            padding: 12px 24px;
+            background: white;
+            border-bottom: 1px solid #d1d5db;
+        }
+
+        #map {
+            height: calc(100vh - 105px);
+            background: #e5e7eb;
+        }
+
+        .building-popup {
+            font-size: 14px;
+            line-height: 1.6;
+            min-width: 230px;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .actions {
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 7px 10px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .approve {
+            background: #16a34a;
+            color: white;
+        }
+
+        .reject {
+            background: #dc2626;
+            color: white;
+        }
+
+        .pending {
+            background: #6b7280;
+            color: white;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<header>
+
+    <h1>
+        TerraTrace AI
+    </h1>
+
+</header>
+
+<div id="info">
+    Loading building data...
+</div>
+
+<div id="map"></div>
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+<script>
+
+    const map =
+        L.map("map");
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19,
+            attribution:
+                "&copy; OpenStreetMap contributors"
+        }
+    ).addTo(map);
+
+    let buildingLayer;
+
+    function loadBuildings() {
+
+        fetch("/api/gis/buildings")
+            .then(
+                response => {
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            "Failed to load GIS data"
+                        );
+
+                    }
+
+                    return response.json();
+
+                }
+            )
+            .then(
+                data => {
+
+                    if (buildingLayer) {
+
+                        map.removeLayer(
+                            buildingLayer
+                        );
+
+                    }
+
+                    buildingLayer =
+                        L.geoJSON(
+                            data,
+                            {
+
+                                style:
+                                    function(feature) {
+
+                                        const status =
+                                            feature
+                                                .properties
+                                                .verificationStatus
+                                                || "PENDING";
+
+                                        if (
+                                            status === "APPROVED"
+                                        ) {
+
+                                            return {
+                                                weight: 2,
+                                                fillOpacity: 0.35
+                                            };
+
+                                        }
+
+                                        if (
+                                            status === "REJECTED"
+                                        ) {
+
+                                            return {
+                                                weight: 2,
+                                                fillOpacity: 0.20
+                                            };
+
+                                        }
+
+                                        return {
+                                            weight: 2,
+                                            fillOpacity: 0.30
+                                        };
+
+                                    },
+
+                                onEachFeature:
+                                    function(
+                                        feature,
+                                        layer
+                                    ) {
+
+                                        layer.bindPopup(
+                                            createPopup(
+                                                feature.properties
+                                            )
+                                        );
+
+                                    }
+
+                            }
+                        )
+                        .addTo(map);
+
+                    const bounds =
+                        buildingLayer.getBounds();
+
+                    if (
+                        bounds.isValid()
+                    ) {
+
+                        map.fitBounds(
+                            bounds,
+                            {
+                                padding: [
+                                    30,
+                                    30
+                                ]
+                            }
+                        );
+
+                    }
+
+                    document
+                        .getElementById("info")
+                        .textContent =
+                            "Buildings detected: "
+                            + data.features.length
+                            + " | CRS: WGS84 (EPSG:4326)";
+
+                }
+            )
+            .catch(
+                error => {
+
+                    document
+                        .getElementById("info")
+                        .textContent =
+                            "Failed to load building data.";
+
+                    console.error(
+                        error
+                    );
+
+                }
+            );
+
+    }
+
+    function createPopup(properties) {
+
+        const status =
+            properties.verificationStatus
+            || "PENDING";
+
+        const note =
+            properties.verificationNote
+            || "None";
+
+        return (
+            "<div class='building-popup'>"
+
+            + "<b>Building ID:</b> "
+            + properties.id
+
+            + "<br>"
+
+            + "<b>Feature:</b> "
+            + properties.featureType
+
+            + "<br>"
+
+            + "<b>Area:</b> "
+            + properties.mapArea
+
+            + "<br>"
+
+            + "<b>Perimeter:</b> "
+            + properties.perimeter
+
+            + "<br>"
+
+            + "<b>Status:</b> "
+            + "<span class='status'>"
+            + status
+            + "</span>"
+
+            + "<br>"
+
+            + "<b>Note:</b> "
+            + note
+
+            + "<div class='actions'>"
+
+            + "<button "
+            + "class='approve verification-button' "
+            + "data-id='"
+            + properties.id
+            + "' "
+            + "data-status='APPROVED'>"
+            + "Approve"
+            + "</button>"
+
+            + "<button "
+            + "class='reject verification-button' "
+            + "data-id='"
+            + properties.id
+            + "' "
+            + "data-status='REJECTED'>"
+            + "Reject"
+            + "</button>"
+
+            + "<button "
+            + "class='pending verification-button' "
+            + "data-id='"
+            + properties.id
+            + "' "
+            + "data-status='PENDING'>"
+            + "Reset"
+            + "</button>"
+
+            + "</div>"
+
+            + "</div>"
+        );
+
+    }
+
+    document.addEventListener(
+        "click",
+        function(event) {
+
+            const button =
+                event.target.closest(
+                    ".verification-button"
+                );
+
+            if (!button) {
+
+                return;
+
+            }
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+            const id =
+                button.dataset.id;
+
+            const status =
+                button.dataset.status;
+
+            updateBuilding(
+                id,
+                status,
+                button
+            );
+
+        }
+    );
+
+    function updateBuilding(
+        id,
+        status,
+        button
+    ) {
+
+        const buttons =
+            document.querySelectorAll(
+                ".verification-button"
+            );
+
+        buttons.forEach(
+            item => {
+
+                item.disabled = true;
+
+            }
+        );
+
+        fetch(
+            "/api/buildings/"
+            + encodeURIComponent(id)
+            + "/verification?status="
+            + encodeURIComponent(status),
+            {
+                method: "PUT"
+            }
+        )
+        .then(
+            response => {
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Failed to update building"
+                    );
+
+                }
+
+                return response.json();
+
+            }
+        )
+        .then(
+            result => {
+
+                console.log(
+                    "Verification updated:",
+                    result
+                );
+
+                loadBuildings();
+
+            }
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    error
+                );
+
+                alert(
+                    "Failed to update building verification status."
+                );
+
+                buttons.forEach(
+                    item => {
+
+                        item.disabled = false;
+
+                    }
+                );
+
+            }
+        );
+
+    }
+
+    loadBuildings();
+
+</script>
+
+</body>
+
+</html>
